@@ -5,6 +5,7 @@
 
 #include "DifferenceFinie.hpp"
 #include <vector>
+#include <cmath>
 
 /**
  * @brief Resoution d'un système tridiagonal par la méthode de Thomas
@@ -52,15 +53,85 @@ std::vector<double> ThomasAlgo(const std::vector<double> &l, const std::vector<d
  */
 std::vector<std::vector<double>> Crank_Nicholson::solve()
 {
-	// Implémentation de la méthode de Crank-Nicholson
-	// Les parametres de l'EDP
-	double r = getEDP().getActif().r;
-	double sigma = getEDP().getActif().sigma;
+	// Paramètres de l'actif
+	double r = getEDP().getActif().r_;
+	double sigma = getEDP().getActif().sigma_;
 
-	// Initialisation des vecteurs de la matrice tridiagonale
-	std::vector<double> u(N_ - 2, 0.0);
-	std::vector<double> d(N_ - 1, 0.0);
-	std::vector<double> l(N_ - 2, 0.0);
+	// taile du systeme
+	int size = N_ - 2;
 
-	// remplissage des coefficients de la matrice
+	// Vecteurs de la matrice tridiagonale
+	std::vector<double> l(size - 1, 0.0);
+	std::vector<double> d(size, 0.0);
+	std::vector<double> u(size - 1, 0.0);
+	std::vector<double> b(size, 0.0);
+
+	// Matrice des prix
+	std::vector<std::vector<double>> V(M_, std::vector<double>(N_, 0.0));
+
+	// Condition terminale (payoff)
+	for (int i = 0; i < N_; ++i)
+	{
+		V[M_ - 1][i] = getEDP().getOption().payoff(L_[i]);
+	}
+
+	// Boucle sur le temps (de T vers 0)
+	for (int m = M_ - 2; m >= 0; --m)
+	{
+		// Conditions aux bords
+		V[m][0] = getEDP().getOption().lowerBoundary(t_[m], r);
+		V[m][N_ - 1] = getEDP().getOption().upperBoundary(L_[N_ - 1], t_[m], r);
+
+		// Calcul des coefficients pour Thomas
+		for (int i = 1; i < N_ - 1; ++i)
+		{
+			int idx = i - 1; // Indice pour les vecteurs Thomas (0 à size-1)
+
+			double Si = L_[i];
+			double a = 0.5 * sigma * sigma * Si * Si / (dS_ * dS_) - 0.5 * r * Si / dS_;
+			double b_diag = -sigma * sigma * Si * Si / (dS_ * dS_) - r;
+			double c = 0.5 * sigma * sigma * Si * Si / (dS_ * dS_) + 0.5 * r * Si / dS_;
+
+			// Remplissage de la Diagonale
+			d[idx] = 1.0 - (dt_ / 2.0) * b_diag;
+
+			// Remplissage Sous-diagonale
+			if (idx > 0)
+			{
+				l[idx - 1] = -(dt_ / 2.0) * a;
+			}
+
+			// Remplissage Sur-diagonale
+			if (idx < size - 1)
+			{
+				u[idx] = -(dt_ / 2.0) * c;
+			}
+
+			// Remplissage de la second membre
+			b[idx] = (dt_ / 2.0 * a) * V[m + 1][i - 1] +
+					 (1.0 + dt_ / 2.0 * b_diag) * V[m + 1][i] +
+					 (dt_ / 2.0 * c) * V[m + 1][i + 1];
+
+			// Injection des conditions aux bords (termes connus au temps m)
+			if (i == 1)
+			{
+				b[idx] += (dt_ / 2.0 * a) * V[m][0];
+			}
+			if (i == N_ - 2)
+			{
+				b[idx] += (dt_ / 2.0 * c) * V[m][N_ - 1];
+			}
+		}
+
+		// Résolution du système tridiagonal
+		std::vector<double> V_new = ThomasAlgo(l, d, u, b);
+
+		// Mise à jour des valeurs internes
+		for (int i = 1; i < N_ - 1; ++i)
+		{
+			V[m][i] = V_new[i - 1];
+		}
+	}
+
+	return V;
 }

@@ -16,6 +16,7 @@ class Option
 protected:
 	double K_; // Prix d'exercice de l'option
 	double T_; // Date d'échéance de l'option
+
 public:
 	/**
 	 * @brief Constructeur de la classe Option
@@ -30,6 +31,23 @@ public:
 	 * @return Payoff de l'option
 	 */
 	virtual double payoff(double S) const = 0;
+
+	/**
+	 * @brief Méthode virtuelle pure pour la condition de frontière inférieure
+	 * @param t Temps actuel
+	 * @param r Taux d'intérêt sans risque
+	 * @return Valeur de la condition de frontière inférieure
+	 */
+	virtual double lowerBoundary(double t, double r) const = 0;
+
+	/**
+	 * @brief Méthode virtuelle pure pour la condition de frontière supérieure
+	 * @param S_max Prix maximum du sous-jacent
+	 * @param t Temps actuel
+	 * @param r Taux d'intérêt sans risque
+	 * @return Valeur de la condition de frontière supérieure
+	 */
+	virtual double upperBoundary(double S_max, double t, double r) const = 0;
 
 	/**
 	 * @brief getteur pour le prix d'exercice (strike)
@@ -69,6 +87,23 @@ public:
 	 * @return Payoff de l'option d'achat
 	 */
 	double payoff(double S) const override;
+
+	/**
+	 * @brief Condition de frontière inférieure pour l'option d'achat
+	 * @param t Temps actuel
+	 * @param r Taux d'intérêt sans risque
+	 * @return Valeur de la condition de frontière inférieure
+	 */
+	double lowerBoundary(double t, double r) const override;
+
+	/**
+	 * @brief Condition de frontière supérieure pour l'option d'achat
+	 * @param S_max Prix maximum du sous-jacent
+	 * @param t Temps actuel
+	 * @param r Taux d'intérêt sans risque
+	 * @return Valeur de la condition de frontière supérieure
+	 */
+	double upperBoundary(double S_max, double t, double r) const override;
 };
 
 /**
@@ -79,7 +114,7 @@ class Put : public Option
 {
 public:
 	/**
-	 * @brief Constructeur de la classe Call
+	 * @brief Constructeur de la classe Put
 	 * @param K Prix d'exercice de l'option (strike)
 	 * @param T Date d'échéance de l'option
 	 */
@@ -91,6 +126,23 @@ public:
 	 * @return Payoff de l'option d'achat
 	 */
 	double payoff(double S) const override;
+
+	/**
+	 * @brief Condition de frontière inférieure pour l'option de vente
+	 * @param t Temps actuel
+	 * @param r Taux d'intérêt sans risque
+	 * @return Valeur de la condition de frontière inférieure
+	 */
+	double lowerBoundary(double t, double r) const override;
+
+	/**
+	 * @brief Condition de frontière supérieure pour l'option de vente
+	 * @param S_max Prix maximum du sous-jacent
+	 * @param t Temps actuel
+	 * @param r Taux d'intérêt sans risque
+	 * @return Valeur de la condition de frontière supérieure
+	 */
+	double upperBoundary(double S_max, double t, double r) const override;
 };
 
 /**
@@ -100,9 +152,17 @@ public:
 
 struct Actif
 {
-	double S0;			// Prix initial de l'actif sous-jacent
-	double r = 0.1;		// Taux d'intérêt sans risque
-	double sigma = 0.1; // Volatilité de l'actif sous-jacent
+	double S0_;			 // Prix initial de l'actif sous-jacent
+	double r_ = 0.1;	 // Taux d'intérêt sans risque
+	double sigma_ = 0.1; // Volatilité de l'actif sous-jacent
+
+	/**
+	 * @brief Constructeur de la structure Actif
+	 * @param S0_ Prix initial de l'actif sous-jacent
+	 * @param r_ Taux d'intérêt sans risque
+	 * @param sigma_ Volatilité de l'actif sous-jacent
+	 */
+	Actif(double S0_, double r_ = 0.1, double sigma_ = 0.1) : S0_(S0_), r_(r_), sigma_(sigma_) {}
 };
 
 #endif

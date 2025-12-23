@@ -41,14 +41,14 @@ public:
 	 * @param M Nombre de points en temps
 	 * @param dt Pas de temps
 	 * @param dS Pas d'espace des prix
-	 * @param S Grille des prix de l'actif sous-jacent
+	 * @param L Grille des prix de l'actif sous-jacent
 	 * @param t Grille des temps
 	 */
-	DifferenceFinie(EDP &edp, int N, int M, const std::vector<double> &S, const std::vector<double> &t)
-		: edp_(edp), N_(N), M_(M), L_(S), t_(t)
+	DifferenceFinie(EDP &edp, int N, int M, const std::vector<double> &L, const std::vector<double> &t)
+		: edp_(edp), N_(N), M_(M), L_(L), t_(t)
 	{
-		dt_ = t_[1] - t_[0];
-		dS_ = L_[1] - L_[0];
+		dt_ = t_[1] - t_[0]; // Calcul du pas de temps en supposant une grille uniforme
+		dS_ = L_[1] - L_[0]; // Calcul du pas d'espace en supposant une grille uniforme
 	}
 
 	/**
@@ -105,11 +105,11 @@ public:
 	 * @param edp reference vers l'EDP associée à la méthode différence finie
 	 * @param N Nombre de points en espace
 	 * @param M Nombre de points en temps
-	 * @param S Grille des prix de l'actif sous-jacent
+	 * @param L Grille des prix de l'actif sous-jacent
 	 * @param t Grille des temps
 	 */
-	Crank_Nicholson(EDP &edp, int N, int M, const std::vector<double> &S, const std::vector<double> &t)
-		: DifferenceFinie(edp, N, M, S, t) {}
+	Crank_Nicholson(EDP &edp, int N, int M, const std::vector<double> &L, const std::vector<double> &t)
+		: DifferenceFinie(edp, N, M, L, t) {}
 
 	/**
 	 * @brief Résout l'EDP en utilisant la méthode de Crank-Nicholson
@@ -130,11 +130,11 @@ public:
 	 * @param edp reference vers l'EDP associée à la méthode différence finie
 	 * @param N Nombre de points en espace
 	 * @param M Nombre de points en temps
-	 * @param S Grille des prix de l'actif sous-jacent
+	 * @param L Grille des prix de l'actif sous-jacent
 	 * @param t Grille des temps
 	 */
-	Implicite(EDP &edp, int N, int M, const std::vector<double> &S, const std::vector<double> &t)
-		: DifferenceFinie(edp, N, M, S, t) {}
+	Implicite(EDP &edp, int N, int M, const std::vector<double> &L, const std::vector<double> &t)
+		: DifferenceFinie(edp, N, M, L, t) {}
 
 	/**
 	 * @brief Résout l'EDP en utilisant la méthode implicite
