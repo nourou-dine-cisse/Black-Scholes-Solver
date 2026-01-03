@@ -16,9 +16,9 @@
  */
 class Sdl
 {
-private:
+protected:
 	SDL_Window *window_;
-	SDL_Render *renderer_;
+	SDL_Renderer *renderer_; // Correction : SDL_Renderer
 	int height_;
 	int width_;
 	bool running_;
@@ -41,7 +41,7 @@ public:
 	/**
 	 * @brief
 	 */
-	SDL_Renderer *present()
+	void present() // Correction : type de retour void
 	{
 		SDL_RenderPresent(renderer_);
 	}
@@ -65,5 +65,5 @@ public:
 	 * @brief nettoyage de la fenêtre
 	 */
 	void clear();
-}
+};
 #endif
