@@ -1,0 +1,892 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{newunicodechar}
+\newunicodechar{ }{\,}
+
+\geometry{hmargin=2.5cm,vmargin=2.5cm}
+
+\lstset{
+language=C++,
+basicstyle=\ttfamily\small,
+keywordstyle=\color{blue},
+commentstyle=\color{gray},
+stringstyle=\color{red},
+breaklines=true,
+frame=single
+}
+
+\title{Rapport de résolution numérique de l’équation de Black--Scholes}
+\author{Mouhamed CISSE \\ Mohammed-Yahya DAMI}
+\date{\today}
+
+\begin{document}
+
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+{\LARGE\bfseries Rapport de résolution numérique de l’équation de Black--Scholes\par}
+\vspace{0.5cm}
+{\Large Par différences finies\par}
+\vspace{2cm}
+{\large Module : Programmation avancée et projet\par}
+{\large ENSIIE\par}
+
+\vspace{1.5cm}
+
+\begin{tabular}{ll}
+Étudiants : & Mouhamed CISSE, Mohammed-Yahya DAMI \\
+Année universitaire : & 2025--2026
+\end{tabular}
+
+\vfill
+{\large \today\par}
+\end{titlepage}
+
+\begin{abstract}
+Ce rapport présente une résolution numérique de l’équation de Black--Scholes pour la valorisation d’options européennes, en adoptant les bonnes pratiques de la programmation avancée et orientée objet. Deux schémas de différences finies sont étudiés et implémentés en C++ : le schéma implicite et la méthode de Crank--Nicholson. Une étude théorique est menée, incluant la transformation de l’équation de Black--Scholes en une équation de diffusion. Une discrétisation spatio-temporelle est ensuite introduite. Les systèmes linéaires tridiagonaux obtenus sont résolus à l’aide de l’algorithme de Thomas. Les résultats numériques sont visualisés à l’aide de la bibliothèque SDL pour les options Call et Put, ainsi que pour l’erreur entre les deux méthodes.
+\end{abstract}
+\newpage
+
+\tableofcontents
+\newpage
+
+\section{Introduction et contexte}
+
+Le modèle de Black--Scholes, développé par Black, Scholes et Merton en 1973, est une
+référence pour la valorisation des options européennes. Il repose sur des hypothèses
+classiques telles que l’efficience des marchés financiers, la constance de la
+volatilité du sous-jacent et l’existence d’un taux d’intérêt sans risque connus à
+l’avance. Sous ces hypothèses, le prix d’une option vérifie une équation aux dérivées
+partielles.
+
+La résolution analytique de cette équation n’est possible que dans des cas
+particuliers, ce qui justifie le recours à des méthodes numériques. Dans ce projet,
+l’équation de Black--Scholes est résolue numériquement à l’aide de méthodes de
+différences finies, notamment les schémas implicites et de Crank--Nicholson, puis
+implémentée en langage C++ dans une architecture logicielle structurée.
+
+\section{Étude théorique}
+
+\subsection{Équation de Black--Scholes}
+
+On note $C(t,S)$ le prix d’une option européenne en fonction du temps
+$t \in [0,T]$ et du prix du sous-jacent $S \in [0,L]$. La fonction $C$ vérifie
+l’équation aux dérivées partielles suivante :
+\begin{equation}
+\frac{\partial C}{\partial t}
++ rS \frac{\partial C}{\partial S}
++ \frac{1}{2}\sigma^2 S^2 \frac{\partial^2 C}{\partial S^2}
+= rC
+\end{equation}
+
+où :
+\begin{itemize}
+\item $T$ est la maturité de l’option,
+\item $L$ est une borne supérieure du prix du sous-jacent,
+\item $r$ est le taux d’intérêt sans risque,
+\item $\sigma$ est la volatilité du sous-jacent.
+\end{itemize}
+
+\subsection{Conditions terminales et aux limites}
+
+La condition terminale correspond au payoff à maturité $t=T$. On considère deux
+types d’options européennes de strike $K>0$.
+
+\paragraph{Option Put européenne}
+
+\[
+C(T,S) = \max(K-S,0), \quad S \in [0,L]
+\]
+\[
+C(t,0) = K e^{-r(T-t)}, \quad t \in [0,T]
+\]
+\[
+C(t,L) = 0, \quad t \in [0,T]
+\]
+
+\paragraph{Option Call européenne}
+
+\[
+C(T,S) = \max(S-K,0), \quad S \in [0,L]
+\]
+\[
+C(t,0) = 0, \quad t \in [0,T]
+\]
+\[
+C(t,L) = L - K e^{-r(T-t)}, \quad t \in [0,T]
+\]
+\subsection{Équation réduite}
+
+L’équation de Black--Scholes peut être transformée par un changement de variables
+approprié en une équation de diffusion classique. Cette transformation permet de
+simplifier l’étude numérique tout en conservant les propriétés essentielles du
+modèle.
+
+On part de l’équation de Black--Scholes écrite sous la forme :
+\begin{equation}
+\frac{\partial C}{\partial t}
++ rS \frac{\partial C}{\partial S}
++ \frac{1}{2}\sigma^2 S^2 \frac{\partial^2 C}{\partial S^2}
+- rC = 0.
+\end{equation}
+
+\subsubsection*{Changement de variable spatial}
+
+On introduit la variable logarithmique :
+\[
+x = \ln\left(\frac{S}{K}\right),
+\]
+où \(K\) est le strike de l’option. On définit ensuite une nouvelle fonction
+\(u(t,x)\) telle que :
+\[
+C(t,S) = K \, u(t,x).
+\]
+
+Les dérivées par rapport à \(S\) s’expriment alors en fonction de \(x\) :
+\[
+\frac{\partial C}{\partial S}
+= \frac{1}{S} K \frac{\partial u}{\partial x},
+\]
+\[
+\frac{\partial^2 C}{\partial S^2}
+= \frac{K}{S^2}
+\left(
+\frac{\partial^2 u}{\partial x^2}
+- \frac{\partial u}{\partial x}
+\right).
+\]
+
+\subsubsection*{Changement de variable temporel}
+
+On effectue un renversement du temps afin de transformer la condition terminale en
+condition initiale :
+\[
+\tau = T - t.
+\]
+
+La dérivée temporelle devient alors :
+\[
+\frac{\partial C}{\partial t}
+= -K \frac{\partial u}{\partial \tau}.
+\]
+
+\subsubsection*{Équation transformée}
+
+En injectant ces expressions dans l’équation de Black--Scholes, on obtient :
+\begin{equation}
+\frac{\partial u}{\partial \tau}
+=
+\frac{1}{2}\sigma^2
+\frac{\partial^2 u}{\partial x^2}
++
+\left(
+r - \frac{1}{2}\sigma^2
+\right)
+\frac{\partial u}{\partial x}
+-
+r u.
+\end{equation}
+
+\subsubsection*{Élimination du terme de dérivée première}
+
+On cherche à éliminer le terme en dérivée première en introduisant le changement de
+fonction :
+\[
+u(\tau,x) = e^{\alpha x + \beta \tau} v(\tau,x),
+\]
+où les constantes \( \alpha \) et \( \beta \) sont choisies de manière appropriée.
+
+En imposant l’annulation du terme en \( \partial v / \partial x \), on obtient :
+\[
+\alpha = -\frac{1}{2} \left( \frac{2r}{\sigma^2} - 1 \right).
+\]
+
+On définit alors le paramètre :
+\[
+\mu = \frac{2r}{\sigma^2} - 1.
+\]
+
+\subsubsection*{Équation réduite de diffusion}
+
+Avec ces choix, la fonction \(v(\tau,x)\) vérifie l’équation de diffusion classique :
+\begin{equation}
+\frac{\partial v}{\partial \tau}
+=
+\frac{\sigma^2}{2}
+\frac{\partial^2 v}{\partial x^2}.
+\end{equation}
+
+Cette équation est une équation de la chaleur, bien connue en analyse numérique.
+Elle constitue l’équation réduite de Black--Scholes et sert de base à la mise en
+œuvre de schémas numériques simples et efficaces.
+
+
+\subsection{Discrétisation du domaine}
+
+Pour réaliser la résolution numérique de l’équation aux dérivées partielles de
+Black--Scholes, on procède tout d’abord à une discrétisation du domaine temporel et
+du domaine spatial.
+
+L’intervalle temporel $[0,T]$ est découpé en $M$ sous-intervalles
+$[t_i,t_{i+1}]$ de pas constant
+\[
+\Delta t = t_{i+1} - t_i .
+\]
+
+De même, l’intervalle spatial $[0,L]$ correspondant au prix du sous-jacent est
+découpé en $N$ sous-intervalles $[S_j,S_{j+1}]$ de pas
+\[
+\Delta S = S_{j+1} - S_j .
+\]
+
+Les points de discrétisation sont définis par :
+\[
+t_n = n\Delta t, \quad n = 0,\dots,M,
+\]
+\[
+S_j = j\Delta S, \quad j = 0,\dots,N.
+\]
+
+La solution discrète est alors notée :
+\[
+C_j^n \approx C(t_n,S_j),
+\]
+où $C_j^n$ représente une approximation numérique du prix de l’option au temps
+$t_n$ et au prix du sous-jacent $S_j$.
+
+
+\subsection{Approximation des dérivées}
+
+Les dérivées spatiales sont approchées par des différences finies centrées, tandis
+que la dérivée temporelle est approchée par une différence arrière ou centrée selon
+le schéma utilisé.
+
+\subsection{Méthode de Crank--Nicholson}
+
+La méthode de Crank--Nicholson est un schéma implicite d’ordre deux en temps,
+obtenu par moyennage entre un schéma explicite et un schéma implicite. Elle
+présente un bon compromis entre précision et stabilité numérique.
+
+On considère l’équation de Black--Scholes sous la forme :
+\begin{equation}
+\frac{\partial C}{\partial t}
++ rS \frac{\partial C}{\partial S}
++ \frac{1}{2}\sigma^2 S^2 \frac{\partial^2 C}{\partial S^2}
+- rC = 0.
+\end{equation}
+
+\subsubsection*{Discrétisation temporelle}
+
+La dérivée temporelle est approchée par une différence centrée :
+\[
+\frac{\partial C}{\partial t}(t_n,S_j)
+\approx
+\frac{C_j^{n+1} - C_j^{n}}{\Delta t}.
+\]
+
+\subsubsection*{Discrétisation spatiale}
+
+Les dérivées spatiales sont approchées par des différences finies centrées :
+\[
+\frac{\partial C}{\partial S}(t_n,S_j)
+\approx
+\frac{C_{j+1}^n - C_{j-1}^n}{2\Delta S},
+\]
+\[
+\frac{\partial^2 C}{\partial S^2}(t_n,S_j)
+\approx
+\frac{C_{j+1}^n - 2C_j^n + C_{j-1}^n}{(\Delta S)^2}.
+\]
+
+Dans la méthode de Crank--Nicholson, les termes spatiaux sont évalués à la moyenne
+des instants $t_n$ et $t_{n+1}$.
+
+\subsubsection*{Formulation du schéma}
+
+On obtient alors, pour tout $j=1,\dots,N-1$ :
+\begin{align}
+\frac{C_j^{n+1} - C_j^n}{\Delta t}
+&+
+\frac{1}{2}
+\Bigl[
+\mathcal{L} C^{n+1}_j
++
+\mathcal{L} C^{n}_j
+\Bigr]
+= 0,
+\end{align}
+où l’opérateur spatial $\mathcal{L}$ est défini par :
+\[
+\mathcal{L} C_j
+=
+rS_j \frac{C_{j+1} - C_{j-1}}{2\Delta S}
++
+\frac{1}{2}\sigma^2 S_j^2
+\frac{C_{j+1} - 2C_j + C_{j-1}}{(\Delta S)^2}
+- rC_j.
+\]
+
+\subsubsection*{Mise sous forme algébrique}
+
+Après réorganisation des termes, on obtient un système linéaire de la forme :
+\[
+a_j C_{j-1}^{n+1}
++ b_j C_j^{n+1}
++ c_j C_{j+1}^{n+1}
+=
+d_j,
+\]
+où les coefficients sont donnés par :
+\[
+a_j =
+-\frac{\Delta t}{4}
+\left(
+\frac{\sigma^2 S_j^2}{(\Delta S)^2}
+-
+\frac{rS_j}{\Delta S}
+\right),
+\]
+\[
+b_j =
+1
++
+\frac{\Delta t}{2}
+\left(
+\frac{\sigma^2 S_j^2}{(\Delta S)^2}
++
+r
+\right),
+\]
+\[
+c_j =
+-\frac{\Delta t}{4}
+\left(
+\frac{\sigma^2 S_j^2}{(\Delta S)^2}
++
+\frac{rS_j}{\Delta S}
+\right),
+\]
+et le second membre :
+\begin{align}
+d_j &=
+\frac{\Delta t}{4}
+\left(
+\frac{\sigma^2 S_j^2}{(\Delta S)^2}
+-
+\frac{rS_j}{\Delta S}
+\right)
+C_{j-1}^{n}
+\\
+&\quad
++
+\left(
+1
+-
+\frac{\Delta t}{2}
+\left(
+\frac{\sigma^2 S_j^2}{(\Delta S)^2}
++
+r
+\right)
+\right)
+C_j^{n}
+\\
+&\quad
++
+\frac{\Delta t}{4}
+\left(
+\frac{\sigma^2 S_j^2}{(\Delta S)^2}
++
+\frac{rS_j}{\Delta S}
+\right)
+C_{j+1}^{n}.
+\end{align}
+
+\subsubsection*{Système tridiagonal}
+
+À chaque pas de temps, le schéma de Crank--Nicholson conduit donc à la résolution
+d’un système linéaire tridiagonal :
+\[
+\begin{pmatrix}
+b_1 & c_1 & 0 & \cdots & 0 \\
+a_2 & b_2 & c_2 & \ddots & \vdots \\
+0 & \ddots & \ddots & \ddots & 0 \\
+\vdots & \ddots & a_{N-2} & b_{N-2} & c_{N-2} \\
+0 & \cdots & 0 & a_{N-1} & b_{N-1}
+\end{pmatrix}
+\begin{pmatrix}
+C_1^{n+1} \\
+C_2^{n+1} \\
+\vdots \\
+C_{N-2}^{n+1} \\
+C_{N-1}^{n+1}
+\end{pmatrix}
+=
+\begin{pmatrix}
+d_1 \\
+d_2 \\
+\vdots \\
+d_{N-2} \\
+d_{N-1}
+\end{pmatrix}.
+\]
+
+\subsection{Schéma implicite}
+
+Le schéma implicite est utilisé pour sa robustesse et sa stabilité numérique,
+notamment lorsque les pas de discrétisation sont relativement grands. Il consiste
+à évaluer l’ensemble des termes spatiaux au temps futur $t_{n+1}$.
+
+On considère l’équation de Black--Scholes sous la forme :
+\begin{equation}
+\frac{\partial C}{\partial t}
++ rS \frac{\partial C}{\partial S}
++ \frac{1}{2}\sigma^2 S^2 \frac{\partial^2 C}{\partial S^2}
+- rC = 0.
+\end{equation}
+
+\subsubsection*{Discrétisation temporelle}
+
+La dérivée temporelle est approchée par une différence arrière :
+\[
+\frac{\partial C}{\partial t}(t_{n+1},S_j)
+\approx
+\frac{C_j^{n+1} - C_j^n}{\Delta t}.
+\]
+
+\subsubsection*{Discrétisation spatiale}
+
+Les dérivées spatiales sont approchées par des différences finies centrées,
+évaluées à l’instant $t_{n+1}$ :
+\[
+\frac{\partial C}{\partial S}(t_{n+1},S_j)
+\approx
+\frac{C_{j+1}^{n+1} - C_{j-1}^{n+1}}{2\Delta S},
+\]
+\[
+\frac{\partial^2 C}{\partial S^2}(t_{n+1},S_j)
+\approx
+\frac{C_{j+1}^{n+1} - 2C_j^{n+1} + C_{j-1}^{n+1}}{(\Delta S)^2}.
+\]
+
+\subsubsection*{Formulation du schéma implicite}
+
+En remplaçant les dérivées par leurs approximations, on obtient pour
+$j = 1,\dots,N-1$ :
+\begin{align}
+\frac{C_j^{n+1} - C_j^n}{\Delta t}
+&+
+rS_j \frac{C_{j+1}^{n+1} - C_{j-1}^{n+1}}{2\Delta S}
+\\
+&+
+\frac{1}{2}\sigma^2 S_j^2
+\frac{C_{j+1}^{n+1} - 2C_j^{n+1} + C_{j-1}^{n+1}}{(\Delta S)^2}
+-
+r C_j^{n+1}
+= 0.
+\end{align}
+
+\subsubsection*{Mise sous forme algébrique}
+
+En regroupant les termes en $C^{n+1}$, on obtient un système linéaire de la forme :
+\[
+a_j C_{j-1}^{n+1}
++ b_j C_j^{n+1}
++ c_j C_{j+1}^{n+1}
+=
+C_j^n,
+\]
+avec les coefficients :
+\[
+a_j =
+-\Delta t
+\left(
+\frac{1}{2}\frac{\sigma^2 S_j^2}{(\Delta S)^2}
+-
+\frac{rS_j}{2\Delta S}
+\right),
+\]
+\[
+b_j =
+1
++
+\Delta t
+\left(
+\frac{\sigma^2 S_j^2}{(\Delta S)^2}
++
+r
+\right),
+\]
+\[
+c_j =
+-\Delta t
+\left(
+\frac{1}{2}\frac{\sigma^2 S_j^2}{(\Delta S)^2}
++
+\frac{rS_j}{2\Delta S}
+\right).
+\]
+
+\subsubsection*{Système matriciel tridiagonal}
+
+À chaque pas de temps, le schéma implicite conduit à la résolution du système
+tridiagonal suivant :
+\[
+\begin{pmatrix}
+b_1 & c_1 & 0 & \cdots & 0 \\
+a_2 & b_2 & c_2 & \ddots & \vdots \\
+0 & \ddots & \ddots & \ddots & 0 \\
+\vdots & \ddots & a_{N-2} & b_{N-2} & c_{N-2} \\
+0 & \cdots & 0 & a_{N-1} & b_{N-1}
+\end{pmatrix}
+\begin{pmatrix}
+C_1^{n+1} \\
+C_2^{n+1} \\
+\vdots \\
+C_{N-2}^{n+1} \\
+C_{N-1}^{n+1}
+\end{pmatrix}
+=
+\begin{pmatrix}
+C_1^n \\
+C_2^n \\
+\vdots \\
+C_{N-2}^n \\
+C_{N-1}^n
+\end{pmatrix}.
+\]
+
+
+
+\subsection{Résolution des systèmes linéaires}
+
+Les schémas implicite et Crank--Nicholson conduisent à la résolution à chaque pas de temps
+d’un système linéaire tridiagonal de la forme :
+\[
+a_j C_{j-1}^{n+1} + b_j C_j^{n+1} + c_j C_{j+1}^{n+1} = d_j, \quad j = 1,\dots,N-1.
+\]
+
+\subsubsection*{Choix de la méthode}
+
+Plutôt que d’utiliser une factorisation LU classique, dont la complexité est en 
+$O(N^3)$ pour un système de taille $N$, on utilise l’algorithme de Thomas.  
+Cet algorithme est spécifiquement adapté aux matrices tridiagonales et résout le
+système en complexité linéaire $O(N)$.
+
+\subsubsection*{Algorithme de Thomas}
+
+L’algorithme de Thomas consiste en deux étapes principales :
+
+\begin{enumerate}
+\item \textbf{Elimination en avant} : on modifie les coefficients pour annuler les
+éléments inférieurs $a_j$ de la matrice, transformant la matrice originale en une
+matrice triangulaire supérieure.
+\[
+\tilde{b}_j = b_j - a_j \frac{c_{j-1}}{\tilde{b}_{j-1}}, \quad
+\tilde{d}_j = d_j - a_j \frac{\tilde{d}_{j-1}}{\tilde{b}_{j-1}}, \quad j = 2,\dots,N-1
+\]
+
+\item \textbf{Substitution en arrière} : on calcule la solution $C_{j}^{n+1}$ à
+partir de la dernière équation et en remontant :
+\[
+C_{N-1}^{n+1} = \frac{\tilde{d}_{N-1}}{\tilde{b}_{N-1}}, \quad
+C_j^{n+1} = \frac{\tilde{d}_j - c_j C_{j+1}^{n+1}}{\tilde{b}_j}, \quad j = N-2,\dots,1.
+\]
+\end{enumerate}
+
+\subsubsection*{Avantages}
+
+\begin{itemize}
+\item Complexité linéaire $O(N)$, beaucoup plus rapide que LU classique pour les
+grands systèmes.
+\item Méthode stable et adaptée aux matrices tridiagonales issues des schémas
+numériques de Black--Scholes.
+\item Facile à implémenter en C++ et mémoire optimisée.
+\end{itemize}
+
+\newpage
+\section{Implémentation en C++}
+
+\subsection{Architecture logicielle}
+
+L’implémentation repose sur une architecture orientée objet structurée autour de classes représentant les options, les EDP et les méthodes numériques.
+
+\subsubsection{Classes pour les options}
+
+\textbf{Classe \texttt{Option}} : classe abstraite servant de base pour les classes \texttt{Put} et \texttt{Call}.
+
+\textbf{Attributs} :
+\begin{itemize}
+    \item \texttt{K\_} : prix d’exercice (Strike)
+    \item \texttt{T\_} : date d’échéance
+\end{itemize}
+
+\textbf{Méthodes} :
+\begin{itemize}
+    \item Getters : \texttt{getK()}, \texttt{getT()}
+    \item Méthodes virtuelles pures : \texttt{payoff(double S)}, \texttt{lowerBoundary(double t, double r)}, \texttt{upperBoundary(double S\_max, double t, double r)}
+\end{itemize}
+
+\textbf{Classes \texttt{Call} et \texttt{Put}} : héritent de \texttt{Option} et implémentent les méthodes virtuelles pures.
+
+\subsubsection{Classes pour les EDP}
+
+\textbf{Classe \texttt{EDP}} : classe abstraite représentant une équation aux dérivées partielles.
+
+\textbf{Attributs} :
+\begin{itemize}
+    \item \texttt{option\_} : référence vers l’option associée
+    \item \texttt{actif\_} : référence vers l’actif sous-jacent
+\end{itemize}
+
+\textbf{Méthodes} :
+\begin{itemize}
+    \item Constructeur : initialise \texttt{option\_} et \texttt{actif\_}
+    \item Getters : \texttt{getOption()}, \texttt{getActif()}
+\end{itemize}
+
+\textbf{Classes \texttt{EDPComplete} et \texttt{EDPReduite}} : héritent de \texttt{EDP} et représentent respectivement l’équation complète et l’équation réduite de Black--Scholes.
+
+\subsubsection{Classes pour les méthodes des différences finies}
+
+\textbf{Classe \texttt{DifferenceFinie}} : classe abstraite représentant une méthode des différences finies pour résoudre une EDP.
+
+\textbf{Attributs} :
+\begin{itemize}
+    \item \texttt{edp\_} : référence vers l’EDP à résoudre
+    \item \texttt{N\_}, \texttt{M\_} : nombre de pas en espace et en temps
+    \item \texttt{dt\_}, \texttt{dS\_} : pas de temps et d’espace
+    \item \texttt{L\_}, \texttt{t\_} : grilles des prix et des temps
+\end{itemize}
+
+\textbf{Méthodes} :
+\begin{itemize}
+    \item Constructeur : initialise tous les attributs
+    \item Getters pour chaque attribut
+    \item Méthode virtuelle pure : \texttt{solve()} pour résoudre l’EDP
+\end{itemize}
+
+\textbf{Classes \texttt{Crank\_Nicholson} et \texttt{Implicite}} : héritent de \texttt{DifferenceFinie}.
+\begin{itemize}
+    \item \texttt{Crank\_Nicholson} : méthode de Crank--Nicholson
+    \item \texttt{Implicite} : méthode implicite
+    \item La fonction \texttt{ThomasAlgo} permet de résoudre efficacement les systèmes tridiagonaux.
+\end{itemize}
+
+\subsubsection{Classe pour l’affichage}
+
+\textbf{Classe \texttt{Sdl}} : permet d’afficher les courbes des prix d’options dans une fenêtre SDL.
+
+\textbf{Attributs} :
+\begin{itemize}
+    \item \texttt{window\_} : pointeur vers la fenêtre SDL
+    \item \texttt{renderer\_} : pointeur vers le renderer SDL
+\end{itemize}
+
+\textbf{Méthodes} :
+\begin{itemize}
+    \item \texttt{drawCurve()} : dessine une courbe
+    \item \texttt{present()} : affiche le renderer
+    \item \texttt{clear()} : nettoie la fenêtre
+    \item \texttt{isRunning()} : vérifie si la fenêtre est ouverte
+\end{itemize}
+
+\newpage
+\section{Choix techniques}
+
+Nous avons opté pour une approche rigoureuse de programmation orientée objet, définissant des classes abstraites comme cadres génériques, puis des classes concrètes spécialisées. Cette architecture s’applique uniformément aux options financières, aux équations aux dérivées partielles et aux méthodes numériques.
+
+Pour les options, la classe abstraite \texttt{Option} est héritée par \texttt{Call} et \texttt{Put}, permettant de factoriser les éléments communs tout en imposant l’implémentation des payoffs et des conditions aux limites spécifiques.
+
+Les équations aux dérivées partielles sont représentées par la classe \texttt{EDP}, dont dérivent \texttt{EDPComplete} et \texttt{EDPReduite}, facilitant le passage entre l’équation complète et l’équation réduite de diffusion sans modifier les solveurs numériques.
+
+Les méthodes numériques reposent sur la classe \texttt{DifferenceFinie}, héritée par \texttt{Implicite} et \texttt{Crank\_Nicholson}, unifiant la gestion des grilles et des structures de données tout en laissant chaque schéma gérer sa formulation spécifique.
+
+L’option est séparée de l’actif sous-jacent, modélisé par une structure indépendante contenant le prix du sous-jacent, la volatilité et le taux d’intérêt. Le lien entre l’option et l’actif est établi au niveau de la classe \texttt{EDP}, conforme à la théorie de Black et Scholes.
+
+Enfin, pour l’affichage, nous avons créé quatre fenêtres SDL distinctes, chacune encapsulée dans la classe Sdl, afin de séparer le calcul numérique de la visualisation, de simplifier le rendu graphique et de garantir une architecture modulaire et extensible. Chaque fenêtre correspond à un graphique spécifique : le prix du call, l’erreur du call, le prix du put et l’erreur du put.
+
+\newpage
+\section{Difficultés rencontrées et solutions apportées}
+
+La première difficulté concernait la modélisation des options. Traduire la notion financière d’option européenne en architecture orientée objet claire et extensible a nécessité de définir clairement les responsabilités de chaque classe. La solution a été la création de la classe abstraite \texttt{Option} et l’ajout des méthodes \texttt{lowerBoundary} et \texttt{upperBoundary} pour gérer correctement les conditions aux limites.
+
+Une seconde difficulté a porté sur la compréhension des schémas numériques et la discrétisation de l’équation de Black--Scholes. La gestion des indices dans les vecteurs et matrices a été source d’erreurs fréquentes, notamment pour l’assemblage des systèmes tridiagonaux. Ces problèmes ont été résolus par un débogage systématique et la vérification progressive des résultats intermédiaires.
+
+Enfin, l’utilisation de la bibliothèque SDL a posé des problèmes : la gestion de plusieurs fenêtres simultanément et le tracé manuel des courbes étaient complexes et fastidieux. La solution adoptée a été de créer quatre fenêtres distinctes, chacune encapsulée dans la classe Sdl, qui centralise les appels bas niveau et fournit une interface simplifiée pour visualiser les courbes et les erreurs, tout en assurant un rendu lisible, modulable et cohérent pour chaque type d’option (call ou put).
+
+
+\newpage
+\section{Affichage et interprétation des résultats}
+
+Les résultats numériques sont visualisés à l’aide de la bibliothèque SDL.
+Pour chaque option, deux courbes sont affichées dans une même fenêtre :
+la solution obtenue par le schéma implicite \( C(0,S) \) et celle obtenue par la méthode de Crank--Nicholson \( \tilde{C}(0,S) \).
+Une seconde fenêtre est dédiée à la courbe d’erreur définie comme la différence point à point entre les deux solutions.
+
+L’analyse conjointe des courbes de prix et des courbes d’erreur permet d’évaluer
+à la fois la cohérence mathématique des schémas numériques
+et leur précision relative.
+
+
+\subsection{Option Call}
+
+La figure \ref{fig:call_prix} présente l’évolution du prix de l’option Call à l’instant initial en fonction du prix du sous-jacent.
+Les solutions issues du schéma implicite et de la méthode de Crank--Nicholson sont superposées,
+respectivement en rouge et en bleu.
+Les erreurs numériques étant très faibles, les deux courbes se confondent visuellement
+et une seule courbe est observable.
+
+Du point de vue financier, la courbe obtenue respecte les propriétés théoriques d’un Call européen :
+le prix de l’option est nul pour les faibles valeurs du sous-jacent
+et croît de manière quasi linéaire lorsque \( S \) devient supérieur au strike.
+La monotonie croissante de la courbe est correctement reproduite par les deux schémas,
+ce qui valide la mise en œuvre des conditions aux limites et du payoff.
+
+\begin{figure}[h!]
+\centering
+\fbox{\includegraphics[width=0.8\textwidth]{call.png}}
+\caption{Prix de l’option Call à \( t=0 \) obtenu par les méthodes implicite et Crank--Nicholson}
+\label{fig:call_prix}
+\end{figure}
+
+L’erreur maximale entre les deux méthodes pour l’option Call est donnée par
+\[
+\max_{S} \left| C(0,S) - \tilde{C}(0,S) \right|
+\]
+
+
+
+\subsection{Erreur entre les deux méthodes pour une option Call}
+La figure \ref{fig:call_erreur} représente la courbe de l’erreur.
+Elle est nulle au voisinage de \( S = 0 \),
+ce qui s’explique par le fait que, pour les deux méthodes,
+la valeur de l’option est imposée par la même condition aux limites.
+Les faibles oscillations observées au centre du domaine
+sont dues à l’approximation numérique
+et à la discrétisation spatiale,
+mais leur amplitude reste très limitée.
+
+Cette courbe confirme que la méthode de Crank--Nicholson
+et le schéma implicite fournissent des résultats très proches,
+avec un écart numérique négligeable à l’échelle des prix de l’option.
+
+\begin{figure}[h!]
+\centering
+\fbox{\includegraphics[width=0.8\textwidth]{erreur call.png}}
+\caption{Erreur entre les méthodes Crank--Nicholson et implicite pour l’option Call}
+\label{fig:call_erreur}
+\end{figure}
+
+\newpage
+\subsection{Option Put}
+
+La figure \ref{fig:put_prix} illustre le prix de l’option Put à l’instant initial.
+Comme pour le Call, les courbes \( C(0,S) \) et \( \tilde{C}(0,S) \)
+obtenues par les deux méthodes sont superposées
+et indiscernables visuellement.
+
+La forme de la courbe est conforme aux propriétés théoriques d’un Put européen :
+le prix de l’option est élevé lorsque le sous-jacent est faible
+et décroît lorsque \( S \) augmente.
+Les deux schémas numériques reproduisent correctement cette décroissance,
+ce qui valide à la fois la modélisation du payoff
+et le traitement des conditions aux limites.
+
+\begin{figure}[h!]
+\centering
+\fbox{\includegraphics[width=0.8\textwidth]{Put.png}}
+\caption{Prix de l’option Put à \( t=0 \) obtenu par les méthodes implicite et Crank--Nicholson}
+\label{fig:put_prix}
+\end{figure}
+
+L’erreur maximale observée pour l’option Put est
+\[
+\max_{S} \left| C(0,S) - \tilde{C}(0,S) \right|
+\]
+
+
+\subsection{Erreur entre les deux méthodes pour une option Put}
+La figure \ref{fig:put_erreur} montre la courbe d’erreur correspondante.
+Comme pour l’option Call,
+l’erreur est nulle aux bornes du domaine,
+où les valeurs de l’option sont imposées analytiquement.
+À l’intérieur du domaine,
+les variations restent faibles et régulières,
+ce qui traduit une bonne stabilité numérique.
+
+L’amplitude légèrement supérieure de l’erreur par rapport au Call
+s’explique par la forme du payoff du Put,
+qui présente une pente plus marquée près du strike.
+Malgré cela, l’erreur reste de l’ordre de \(10^{-3}\),
+confirmant la précision et la robustesse des deux méthodes de résolution.
+
+\begin{figure}[h!]
+\centering
+\fbox{\includegraphics[width=0.8\textwidth]{erreur Put.png}}
+\caption{Erreur entre les méthodes Crank--Nicholson et implicite pour l’option Put}
+\label{fig:put_erreur}
+\end{figure}
+ 
+\newpage
+\section{Limites du modèle et de l’approche numérique}
+
+Ce projet présente certaines limites liées à son périmètre et à ses choix techniques.
+
+L’affichage des résultats repose sur la bibliothèque SDL, ce qui conduit à une visualisation volontairement simple.
+Les courbes sont tracées sans légendes détaillées ni annotations complètes, et la superposition de courbes proches rend parfois la lecture visuelle difficile.
+
+L’analyse numérique reste également limitée.
+La comparaison entre les méthodes implicite et Crank--Nicholson se concentre sur l’erreur maximale à l’instant initial, sans étude approfondie de la convergence ou de l’influence des paramètres de discrétisation.
+
+Enfin, les tests numériques sont réalisés pour un ensemble restreint de paramètres, ce qui limite la portée expérimentale des résultats.
+
+\newpage
+\section{Perspectives et améliorations possibles}
+
+Plusieurs prolongements naturels peuvent être envisagés pour enrichir ce travail.
+
+\subsection{Amélioration numérique}
+
+La précision peut être améliorée par l’utilisation de grilles non uniformes,
+plus fines autour du strike.
+Une étude de convergence en fonction de $\Delta t$ et $\Delta S$ permettrait également de valider expérimentalement l’ordre des schémas utilisés.
+D’autres approches numériques, comme les méthodes de Monte Carlo ou les éléments finis, peuvent aussi être envisagées.
+
+\subsection{Calcul des Grecs}
+
+Les sensibilités financières peuvent être obtenues par différentiation numérique des solutions discrètes.
+Le Delta, le Gamma et le Theta peuvent être approchés par des schémas de différences finies,
+tandis que le Vega peut être estimé en recalculant la solution pour différentes valeurs de la volatilité.
+Ces quantités, plus sensibles numériquement que le prix, permettraient une analyse plus complète des résultats.
+
+\subsection{Extension du cadre}
+
+L’architecture orientée objet facilite l’extension à des produits plus complexes.
+Les options barrières, asiatiques ou américaines peuvent être intégrées moyennant des adaptations des conditions aux limites ou des méthodes de résolution.
+Enfin, le modèle peut être enrichi pour prendre en compte des dynamiques plus réalistes du sous-jacent.
+
+
+\section{Conclusion}
+
+Ce projet a permis de mettre en œuvre une résolution numérique complète de l’équation de Black--Scholes par différences finies, en comparant un schéma implicite et un schéma de Crank--Nicholson. Les résultats obtenus montrent une très bonne cohérence entre les deux approches, confirmant la validité des méthodes employées. L’architecture logicielle proposée offre une base solide pour des extensions futures vers des modèles financiers plus complexes et des produits dérivés plus élaborés.
+
+\newpage
+\section{Annexes}
+\subsection{Diagramme UML des classes}
+\begin{figure}[h!]
+\centering
+\fbox{\includegraphics[width=1.1\textwidth]{UML}}
+\caption{Diagramme UML des classes}
+\end{figure}
+
+\end{document}
